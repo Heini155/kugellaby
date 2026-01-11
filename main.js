@@ -15,6 +15,7 @@ const ballRad = 0.25 * plateLength;
 
 const StopMoving = 0.01;
 const StopSpeed = 0.01;
+const frameBottomDrop = plateHeight * 6.0;
 
 const state = {
   width: 600,
@@ -436,6 +437,37 @@ function updateBoardTransform() {
   );
 }
 
+function clampBoardToBottom() {
+  const boardWidth = plateLength * state.playgroundX;
+  const boardDepth = plateLength * state.playgroundY;
+  if (boardWidth <= 0 || boardDepth <= 0) {
+    return;
+  }
+
+  const halfW = boardWidth / 2;
+  const halfD = boardDepth / 2;
+  const maxAngleX = THREE.MathUtils.radToDeg(
+    Math.asin(Math.min(1, frameBottomDrop / halfD))
+  );
+  const maxAngleZ = THREE.MathUtils.radToDeg(
+    Math.asin(Math.min(1, frameBottomDrop / halfW))
+  );
+  const limitX = Math.min(maxAngle, maxAngleX);
+  const limitZ = Math.min(maxAngle, maxAngleZ);
+  state.angleX = clamp(state.angleX, -limitX, limitX);
+  state.angleZ = clamp(state.angleZ, -limitZ, limitZ);
+
+  const sinX = Math.sin(THREE.MathUtils.degToRad(state.angleX));
+  const sinZ = Math.sin(THREE.MathUtils.degToRad(state.angleZ));
+  const cosZ = Math.cos(THREE.MathUtils.degToRad(state.angleZ));
+  const drop = halfW * Math.abs(sinZ) + halfD * Math.abs(sinX * cosZ);
+  if (drop > frameBottomDrop) {
+    const scale = frameBottomDrop / drop;
+    state.angleX *= scale;
+    state.angleZ *= scale;
+  }
+}
+
 function drawHud() {
   hudCtx.clearRect(0, 0, state.width, state.height);
   hudCtx.save();
@@ -537,7 +569,7 @@ function rebuildFrame() {
   const totalDepth = boardDepth + frameThickness * 2;
   const totalWidth = boardWidth + frameThickness * 2;
   const bottomThickness = plateHeight * 0.6;
-  const bottomDrop = plateHeight * 6.0;
+  const bottomDrop = frameBottomDrop;
   const frameHeight = baseFrameHeight + bottomDrop;
   const y = frameHeight / 2 - bottomDrop;
 
@@ -911,6 +943,7 @@ async function init() {
     lastTime = now;
     accumulator += dt;
 
+    clampBoardToBottom();
     while (accumulator >= step) {
       stepPhysics();
       accumulator -= step;
