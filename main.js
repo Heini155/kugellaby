@@ -87,6 +87,9 @@ const boardOffset = new THREE.Group();
 boardRoot.add(boardOffset);
 scene.add(boardRoot);
 
+const frameRoot = new THREE.Group();
+scene.add(frameRoot);
+
 const ballGroup = new THREE.Group();
 boardOffset.add(ballGroup);
 
@@ -95,6 +98,7 @@ let ballQuat = new THREE.Quaternion();
 
 const materials = {};
 const meshes = [];
+const frameMeshes = [];
 
 function resize() {
   state.width = window.innerWidth;
@@ -480,6 +484,14 @@ function clearMeshes() {
   }
 }
 
+function clearFrame() {
+  while (frameMeshes.length > 0) {
+    const mesh = frameMeshes.pop();
+    frameRoot.remove(mesh);
+    if (mesh.geometry) mesh.geometry.dispose();
+  }
+}
+
 function addWall(x, z, width, depth) {
   const geom = new THREE.BoxGeometry(width, wallHeight, depth);
   const mesh = new THREE.Mesh(geom, materials.mahagony);
@@ -512,6 +524,55 @@ function createPlateWithHoleGeom() {
 
 let plateWithHoleGeom = null;
 
+function rebuildFrame() {
+  clearFrame();
+  const boardWidth = plateLength * state.playgroundX;
+  const boardDepth = plateLength * state.playgroundY;
+  if (boardWidth <= 0 || boardDepth <= 0) {
+    return;
+  }
+
+  const frameThickness = wallWidth * 1.2;
+  const baseFrameHeight = wallHeight * 2.4;
+  const totalDepth = boardDepth + frameThickness * 2;
+  const totalWidth = boardWidth + frameThickness * 2;
+  const bottomThickness = plateHeight * 0.6;
+  const bottomDrop = plateHeight * 6.0;
+  const frameHeight = baseFrameHeight + bottomDrop;
+  const y = frameHeight / 2 - bottomDrop;
+
+  const sideDepth = new THREE.BoxGeometry(frameThickness, frameHeight, totalDepth);
+  const sideWidth = new THREE.BoxGeometry(totalWidth, frameHeight, frameThickness);
+  const frameMat = materials.frame || materials.mahagony;
+
+  const leftWall = new THREE.Mesh(sideDepth, frameMat);
+  leftWall.position.set(-boardWidth / 2 - frameThickness / 2, y, 0);
+  frameRoot.add(leftWall);
+  frameMeshes.push(leftWall);
+
+  const rightWall = new THREE.Mesh(sideDepth, frameMat);
+  rightWall.position.set(boardWidth / 2 + frameThickness / 2, y, 0);
+  frameRoot.add(rightWall);
+  frameMeshes.push(rightWall);
+
+  const frontWall = new THREE.Mesh(sideWidth, frameMat);
+  frontWall.position.set(0, y, -boardDepth / 2 - frameThickness / 2);
+  frameRoot.add(frontWall);
+  frameMeshes.push(frontWall);
+
+  const backWall = new THREE.Mesh(sideWidth, frameMat);
+  backWall.position.set(0, y, boardDepth / 2 + frameThickness / 2);
+  frameRoot.add(backWall);
+  frameMeshes.push(backWall);
+
+  const bottomGeom = new THREE.BoxGeometry(totalWidth, bottomThickness, totalDepth);
+  const bottomMat = materials.bottom || materials.mahagony;
+  const bottom = new THREE.Mesh(bottomGeom, bottomMat);
+  bottom.position.set(0, -bottomThickness / 2 - bottomDrop, 0);
+  frameRoot.add(bottom);
+  frameMeshes.push(bottom);
+}
+
 function rebuildPlaygroundMeshes() {
   clearMeshes();
 
@@ -538,23 +599,6 @@ function rebuildPlaygroundMeshes() {
         boardOffset.add(holePlate);
         meshes.push(holePlate);
 
-        const holeDepth = plateHeight * 3;
-        const holeWallGeom = new THREE.CylinderGeometry(holeRad, holeRad, holeDepth, subdiv, 1, true);
-        const holeWall = new THREE.Mesh(holeWallGeom, materials.hole);
-        holeWall.position.set(xi + plateLength / 2, plateHeight - holeDepth / 2, zi + plateLength / 2);
-        boardOffset.add(holeWall);
-        meshes.push(holeWall);
-
-        const holeBottomGeom = new THREE.CircleGeometry(holeRad, subdiv);
-        const holeBottom = new THREE.Mesh(holeBottomGeom, materials.hole);
-        holeBottom.rotation.x = -Math.PI / 2;
-        holeBottom.position.set(
-          xi + plateLength / 2,
-          plateHeight - holeDepth + 0.02,
-          zi + plateLength / 2
-        );
-        boardOffset.add(holeBottom);
-        meshes.push(holeBottom);
       }
 
       switch (cell) {
@@ -597,6 +641,8 @@ function rebuildPlaygroundMeshes() {
     ballMesh = new THREE.Mesh(ballGeom, materials.ball);
     ballGroup.add(ballMesh);
   }
+
+  rebuildFrame();
 }
 
 function parseTga(buffer) {
@@ -836,6 +882,17 @@ async function init() {
   materials.pine = new THREE.MeshStandardMaterial({ map: pine });
   materials.pineHole = new THREE.MeshStandardMaterial({ map: pine, side: THREE.DoubleSide });
   materials.mahagony = new THREE.MeshStandardMaterial({ map: mahagony });
+  materials.frame = new THREE.MeshStandardMaterial({
+    map: mahagony,
+    color: 0x6b442a,
+    roughness: 0.75,
+    metalness: 0.05,
+  });
+  materials.bottom = new THREE.MeshStandardMaterial({
+    color: 0x1f1a16,
+    roughness: 0.9,
+    metalness: 0.05,
+  });
   materials.ball = new THREE.MeshStandardMaterial({ map: ball });
   materials.goal = new THREE.MeshStandardMaterial({ map: goal });
   materials.hole = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 1 });
