@@ -16,6 +16,10 @@ const ballRad = 0.25 * plateLength;
 const StopMoving = 0.01;
 const StopSpeed = 0.01;
 const frameBottomDrop = plateHeight * 6.0;
+const rollDuration = 0.35;
+const fallDuration = 0.8;
+const fallEndWait = 3.0;
+const fallDepth = plateHeight * 4 + ballRad * 2;
 
 const state = {
   width: 600,
@@ -37,6 +41,20 @@ const state = {
   gravity: 9.81,
   wallBrake: 0.6,
   rubbing: 0.0005,
+  falling: false,
+  fallPhase: "roll",
+  fallStart: 0,
+  fallStartY: 0,
+  fallLockX: 0,
+  fallLockZ: 0,
+  rollFromX: 0,
+  rollFromZ: 0,
+  rollTargetX: 0,
+  rollTargetZ: 0,
+  fallWorldX: 0,
+  fallWorldZ: 0,
+  fallWorldStartY: 0,
+  fallWorldY: 0,
   level: 0,
   levelTime: 0,
   levelStart: 0,
@@ -245,6 +263,31 @@ function holeTest(x, z) {
   return Math.sqrt(dx * dx + dz * dz) < holeRad;
 }
 
+function startBallFall() {
+  const fallWorld = new THREE.Vector3(state.ballX, state.ballY, state.ballZ);
+  boardOffset.localToWorld(fallWorld);
+  const ix = Math.floor(state.ballX / plateLength);
+  const iz = Math.floor(state.ballZ / plateLength);
+  state.fallLockX = state.ballX;
+  state.fallLockZ = state.ballZ;
+  state.rollFromX = state.ballX;
+  state.rollFromZ = state.ballZ;
+  state.rollTargetX = ix * plateLength + plateLength / 2;
+  state.rollTargetZ = iz * plateLength + plateLength / 2;
+  state.fallStartY = state.ballY;
+  state.fallWorldX = fallWorld.x;
+  state.fallWorldZ = fallWorld.z;
+  state.fallWorldStartY = fallWorld.y;
+  state.fallWorldY = fallWorld.y;
+  state.ballSpeedX = 0;
+  state.ballSpeedZ = 0;
+  state.ballAccX = 0;
+  state.ballAccZ = 0;
+  state.falling = true;
+  state.fallStart = performance.now() / 1000;
+  state.fallPhase = "roll";
+}
+
 function goalTest(x, z) {
   return (
     Math.floor(x / plateLength) === state.playgroundX - 1 &&
@@ -340,8 +383,11 @@ function setNewSpeed(angle) {
 }
 
 function stepPhysics() {
+  if (state.falling) {
+    return;
+  }
   if (holeTest(state.ballX, state.ballZ)) {
-    stopGame("Fell into a hole.");
+    startBallFall();
     return;
   }
 
@@ -399,12 +445,20 @@ function updateBallMesh() {
   if (!ballMesh) {
     return;
   }
+  if (state.falling && state.fallPhase === "drop") {
+    ballMesh.position.set(state.fallWorldX, state.fallWorldY, state.fallWorldZ);
+    return;
+  }
   const speed = Math.sqrt(state.ballSpeedX * state.ballSpeedX + state.ballSpeedZ * state.ballSpeedZ);
-  if (speed > 0) {
+  if (!state.falling && speed > 0) {
     const axis = new THREE.Vector3(state.ballSpeedZ, 0, -state.ballSpeedX).normalize();
     const angle = THREE.MathUtils.degToRad(speed * 200);
     const q = new THREE.Quaternion().setFromAxisAngle(axis, angle);
     ballQuat.premultiply(q);
+  }
+  if (ballMesh.parent !== ballGroup) {
+    frameRoot.remove(ballMesh);
+    ballGroup.add(ballMesh);
   }
   ballMesh.position.set(state.ballX, state.ballY, state.ballZ);
   ballMesh.quaternion.copy(ballQuat);
@@ -435,6 +489,48 @@ function updateBoardTransform() {
     0,
     (-plateLength * state.playgroundY) / 2
   );
+}
+
+function updateBallFall(nowSec) {
+  if (!state.falling) {
+    return;
+  }
+  const elapsed = nowSec - state.fallStart;
+  if (state.fallPhase === "roll") {
+    const rollT = clamp(elapsed / rollDuration, 0, 1);
+    const ease = rollT * rollT * (3 - 2 * rollT);
+    state.ballX = state.rollFromX + (state.rollTargetX - state.rollFromX) * ease;
+    state.ballZ = state.rollFromZ + (state.rollTargetZ - state.rollFromZ) * ease;
+    state.ballY = state.fallStartY;
+    if (rollT >= 1) {
+      const fallWorld = new THREE.Vector3(state.ballX, state.ballY, state.ballZ);
+      boardOffset.localToWorld(fallWorld);
+      state.fallWorldX = fallWorld.x;
+      state.fallWorldZ = fallWorld.z;
+      state.fallWorldStartY = fallWorld.y;
+      state.fallWorldY = fallWorld.y;
+      if (ballMesh && ballMesh.parent !== frameRoot) {
+        ballGroup.remove(ballMesh);
+        frameRoot.add(ballMesh);
+      }
+      state.fallPhase = "drop";
+      state.fallStart = nowSec;
+    }
+    return;
+  }
+
+  const fallT = clamp(elapsed / fallDuration, 0, 1);
+  const ease = fallT * fallT * (3 - 2 * fallT);
+  const fallEndY = -frameBottomDrop + ballRad;
+  const maxDrop = Math.max(0, state.fallWorldStartY - fallEndY);
+  const drop = Math.min(maxDrop, fallDepth) * ease;
+  state.fallWorldY = state.fallWorldStartY - drop;
+  if (fallT >= 1) {
+    state.fallWorldY = fallEndY;
+  }
+  if (fallT >= 1 && elapsed >= fallDuration + fallEndWait && !state.stopped) {
+    stopGame("Fell into a hole.");
+  }
 }
 
 function clampBoardToBottom() {
@@ -955,6 +1051,7 @@ async function init() {
       stopGame("Time is up.");
     }
 
+    updateBallFall(now / 1000);
     updateBallMesh();
     updateBoardTransform();
     updateCamera();
