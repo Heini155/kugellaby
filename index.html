@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Kugellabyrinth - Three.js</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #e6e6e6;
+        font-family: "Georgia", "Times New Roman", serif;
+      }
+
+      #app {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+
+      canvas {
+        display: block;
+      }
+
+      #hud {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      #ui {
+        position: absolute;
+        right: 12px;
+        top: 12px;
+        background: rgba(245, 245, 245, 0.9);
+        border: 1px solid #222;
+        padding: 10px 12px;
+        max-width: 240px;
+        font-size: 14px;
+      }
+
+      #ui h3 {
+        margin: 0 0 8px 0;
+        font-size: 16px;
+      }
+
+      #ui label {
+        display: block;
+        margin: 6px 0;
+      }
+
+      #ui select,
+      #ui button {
+        width: 100%;
+        margin-top: 4px;
+        padding: 4px 6px;
+      }
+
+      #help {
+        position: absolute;
+        left: 12px;
+        bottom: 12px;
+        background: rgba(245, 245, 245, 0.9);
+        border: 1px solid #222;
+        padding: 8px 10px;
+        font-size: 12px;
+      }
+
+      .hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="ui">
+        <h3>Menu</h3>
+        <button id="toggleCam">Change Cam</button>
+        <label>
+          Gravity
+          <select id="gravity">
+            <option value="2">Moon</option>
+            <option value="9.81" selected>Earth</option>
+            <option value="25">Jupiter</option>
+          </select>
+        </label>
+        <label>
+          Elastisity
+          <select id="elasticity">
+            <option value="0.99">Flummi</option>
+            <option value="0.6" selected>Normal</option>
+            <option value="0.05">Stone</option>
+          </select>
+        </label>
+        <label>
+          Rubbing
+          <select id="rubbing">
+            <option value="0.005">Wax</option>
+            <option value="0.0005" selected>Normal</option>
+            <option value="0.00005">Glass</option>
+          </select>
+        </label>
+        <label>
+          Mouse Sensity
+          <select id="mouseSensity">
+            <option value="0.5">Soft</option>
+            <option value="1" selected>Normal</option>
+            <option value="2">Row</option>
+          </select>
+        </label>
+        <button id="enableTilt">Enable Tilt</button>
+        <button id="calibrateTilt">Calibrate Tilt</button>
+        <button id="exitGame">Exit</button>
+      </div>
+      <div id="help">
+        Left click: control board (pointer lock) | Right click: camera mode |
+        Middle click: toggle menu | Z: reset | +/-: zoom | Arrows: camera |
+        Tilt: device orientation
+      </div>
+      <canvas id="hud"></canvas>
+    </div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
